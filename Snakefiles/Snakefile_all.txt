@@ -1,0 +1,164 @@
+import os
+
+# Prima di avviare la pipeline, è importante modificare i permessi (-rwm o 777) per tutte le directory
+
+## Definizione delle directory
+base_directory = '/home/chiara-morena/repo/Azole_reanalisi/'
+data_directory = os.path.join(base_directory, 'Raw')
+analysis_directory = os.path.join(base_directory, 'Analysis')
+classifier_directory = os.path.join(base_directory, 'Classifier')
+meta_directory = os.path.join(base_directory, 'Metadata')
+
+# Lista di campioni e letture per l'uso con i wildcard
+reads = ['R1_001', 'R2_001']
+samples = [
+    'trim_1510090F1502360_S101_L001_', 'trim_1510091F1502361_S102_L001_',
+    'trim_1510092F1502362_S103_L001_', 'trim_1510093F1502363_S104_L001_',
+    'trim_1510094F1502364_S105_L001_', 'trim_1510095F1502366_S106_L001_',
+    'trim_1510096F1502367_S107_L001_', 'trim_1510097F1502368_S108_L001_',
+    'trim_1510098F1502369_S109_L001_'
+]
+
+# Regola 'all': deve contenere tutti i file di output della pipeline
+rule all:
+    input:
+        os.path.join(analysis_directory, 'demux-paired-end.qza'),
+        os.path.join(base_directory, 'Analysis', 'demux-paired-end-ptrimm.qza'),
+        os.path.join(base_directory, 'Analysis', 'feature_table.qza'),
+        os.path.join(base_directory, 'Analysis', 'feature.qza'),    
+        os.path.join(analysis_directory, 'filtered-feature-table.qza'),
+    #    os.path.join(analysis_directory, 'filtered-feature-table.qzv'),
+    #    os.path.join(analysis_directory, 'filtered_by_lenght_table.qza'),
+    #    os.path.join(analysis_directory, 'feature_by_lenght_table.qza'),
+        os.path.join(analysis_directory, 'taxonomy.qza'),
+        os.path.join(analysis_directory, 'taxa_boxplot.qzv')
+
+# Regola di importazione delle sequenze
+rule import:
+    input:
+        data = data_directory
+    output:
+        demux = os.path.join(analysis_directory, 'demux-paired-end.qza')
+    shell:
+        """
+        qiime tools import \
+        --type 'SampleData[PairedEndSequencesWithQuality]' \
+        --input-path {input.data} \
+        --input-format CasavaOneEightSingleLanePerSampleDirFmt \
+        --output-path {output.demux}
+        """
+
+# Regola per la rimozione di primers e adattatori
+rule trim:
+    input:
+        os.path.join(base_directory, 'Analysis', 'demux-paired-end.qza')
+    output:
+        os.path.join(base_directory, 'Analysis', 'demux-paired-end-ptrimm.qza')
+    shell:
+        """
+        qiime cutadapt trim-paired \
+        --i-demultiplexed-sequences {input} \
+        --p-cores 3 \
+        --p-front-f GATGAAGAACGYAGYRAA \
+        --p-front-r TCCTCCGCTTATTGATATGC \
+        --p-adapter-f TTYRCTRCGTTCTTCATC \
+        --p-adapter-r GCATATCAATAAGCGGAGGA \
+        --o-trimmed-sequences {output} \
+        --verbose
+        """
+
+# Regola per generare la tabella delle feature (e pulizia estremità sequenze)
+rule dada:
+    input:
+        os.path.join(base_directory, 'Analysis', 'demux-paired-end-ptrimm.qza')
+    output:
+        table = os.path.join(base_directory, 'Analysis', 'feature_table.qza'),
+        seq = os.path.join(base_directory, 'Analysis', 'feature.qza'),
+        dada = os.path.join(base_directory, 'Analysis', 'dada2.stats.qza')
+    shell:
+        """
+        qiime dada2 denoise-paired \
+        --p-n-threads 3 \
+        --i-demultiplexed-seqs {input} \
+        --o-table {output.table} \
+        --o-representative-sequences {output.seq} \
+        --p-trim-left-f 0 \
+        --p-trim-left-r 0 \
+        --p-trunc-len-f 0 \
+        --p-trunc-len-r 0 \
+        --p-chimera-method consensus \
+        --o-denoising-stats {output.dada} \
+        --verbose
+        """
+
+# Regola per il filtraggio delle feature table
+rule filter_table:
+    input:
+        seq = os.path.join(base_directory, 'Analysis', 'feature_table.qza')
+    output:
+        filtered = os.path.join(analysis_directory, 'filtered-feature-table.qza')
+    shell:
+        """
+        qiime feature-table filter-features \
+        --i-table {input.seq} \
+        --o-filtered-table {output.filtered} \
+        --p-min-frequency 6 \
+        --verbose
+        """
+
+#questi comandi servono ad estrarre gli id che hanno una frequenza minima di 6
+##qiime tools export --input-path /home/chiara-morena/repo/its1-metagenomics-analysis/Analysis/filtered-feature-table.qza  --output-path /home/chiara-morena/repo/its1-metagenomics-analysis/Analysis/features_filtered_by_freq
+#biom convert \
+#  --input-fp /home/chiara-morena/repo/Azole_reanalisi/Analysis/features_filtered_by_freq/feature-table.biom \
+#  --output-fp /home/chiara-morena/repo/Azole_reanalisi/Analysis/features_filtered_by_freq/filtered-feature-table.tsv \
+#  --to-tsv
+# awk '{print $1}' /home/chiara-morena/repo/Azole_reanalisi/Analysis/features_filtered_by_freq/filtered-feature-table.tsv > nodroplist.txt
+
+#in base agli id filtrati nella tabella si filtrano le feature
+rule feature_filtered_by_freq:
+    input:
+        seq = os.path.join(base_directory, 'Analysis', 'feature.qza'),
+        meta = os.path.join(base_directory, 'Analysis', 'nodroplist.txt')
+    output:
+        filtered_table = os.path.join(analysis_directory, 'filtered-feature.qza')  # Corretto "lenght" → "length"
+    shell:
+        """
+        qiime feature-table filter-seqs \
+        --i-data {input.seq} \
+        --m-metadata-file {input.meta} \
+        --p-no-exclude-ids \
+        --o-filtered-data {output.filtered_table}
+        """
+
+rule assign:
+    input:
+        table = os.path.join(base_directory, 'Analysis', 'feature.qza'),
+        #classifier = os.path.join(classifier_directory, 'unite_ver10_97_04.04.2024-Q2-2024.5.qza')
+        classifier = os.path.join(classifier_directory, 'unite_ver10_dynamic_04.04.2024-Q2-2024.5.qza')
+    output:
+        taxonomy = os.path.join(analysis_directory, 'taxonomy_din.qza')
+    shell:
+        """
+        qiime feature-classifier classify-sklearn \
+        --i-reads {input.table} \
+        --i-classifier {input.classifier} \
+        --o-classification {output.taxonomy}
+        """
+
+rule boxplot:
+    input:
+        seq = os.path.join(base_directory, 'Analysis', 'feature_table.qza'),
+        ref = os.path.join(analysis_directory, 'taxonomy_din.qza'),
+        #meta = os.path.join(data_directory, 'manifest_v2.tsv')
+        meta = os.path.join(meta_directory, 'manifest_v2.tsv')
+    output:
+        boxplot = os.path.join(analysis_directory, 'taxa_boxplot_din.qzv')
+    shell:
+        """
+        qiime taxa barplot \
+        --i-table {input.seq} \
+        --i-taxonomy {input.ref} \
+        --m-metadata-file {input.meta} \
+        --o-visualization {output.boxplot}
+        """
+        

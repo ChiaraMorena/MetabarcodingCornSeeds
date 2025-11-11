@@ -1,0 +1,77 @@
+# Definisci le variabili delle directory principali 
+import os
+
+base_directory = '/home/chiara-morena/repo/Azole_reanalisi/'
+data_directory = os.path.join(base_directory, 'Raw')
+trimming_output_directory = os.path.join(base_directory, "DataTrim2")
+fastqc_output_directory = os.path.join(trimming_output_directory, "DataTrim2")
+import_path = "/home/chiara-morena/repo/Azole_reanalisi/Raw"
+trimmed = "/home/chiara-morena/repo/Azole_reanalisi/DataTrim2"
+
+# Elenco delle sequenze e campioni
+
+# Elenco delle sequenze e campioni
+reads = ['1_001','2_001']
+samples = ['1510090F1502360_S101_L001','1510091F1502361_S102_L001', '1510092F1502362_S103_L001', '1510093F1502363_S104_L001', '1510094F1502364_S105_L001', '1510095F1502366_S106_L001', '1510096F1502367_S107_L001', '1510097F1502368_S108_L001', '1510098F1502369_S109_L001']
+
+rule_all_input = [
+	expand(os.path.join(data_directory, "{sample}_R1_001.fastq.gz"), sample=samples),
+        expand(os.path.join(data_directory, "{sample}_R2_001.fastq.gz"), sample=samples),
+        expand(os.path.join(trimmed, "trim_{sample}_R1_001.fastq.gz"), sample=samples),
+	expand(os.path.join(trimmed, "trim_{sample}_R2_001.fastq.gz"), sample=samples),
+        expand(os.path.join(trimming_output_directory, "trim_{sample}_R1_001_unpaired.fastq.gz"),sample=samples),
+	expand(os.path.join(trimming_output_directory, "trim_{sample}_R2_001_unpaired.fastq.gz"),sample=samples),
+	expand(os.path.join(fastqc_output_directory, "trim_{sample}_R1_001_fastqc.html"), sample=samples),
+	expand(os.path.join(fastqc_output_directory, "trim_{sample}_R1_001_fastqc.zip"), sample=samples),
+	expand(os.path.join(fastqc_output_directory, "trim_{sample}_R2_001_fastqc.html"), sample=samples),
+	expand(os.path.join(fastqc_output_directory, "trim_{sample}_R2_001_fastqc.zip"), sample=samples)]
+#	trimmed,
+#	os.path.join("qiime","trim_182763.qza"),
+#	os.path.join("qiime","trim_182763demux.qzv")]
+
+rule all:
+   input:
+      rule_all_input
+
+#trimming
+
+rule trimmomatic:
+    input:
+         F_fastq_file = os.path.join(data_directory, "{sample}_R1_001.fastq.gz"),
+	     R_fastq_file = os.path.join(data_directory, "{sample}_R2_001.fastq.gz")
+    output:
+         forward_paired = os.path.join(trimmed, "trim_{sample}_R1_001.fastq.gz"),
+         reverse_paired = os.path.join(trimmed, "trim_{sample}_R2_001.fastq.gz"),
+         forward_unpaired = os.path.join(trimming_output_directory, "trim_{sample}_R1_001_unpaired.fastq.gz"),
+         reverse_unpaired = os.path.join(trimming_output_directory, "trim_{sample}_R2_001_unpaired.fastq.gz")
+    shell:
+        "trimmomatic PE {input.F_fastq_file} {input.R_fastq_file} {output.forward_paired} {output.reverse_paired} {output.forward_unpaired} {output.reverse_unpaired}      	ILLUMINACLIP:TruSeq3-PE.fa:2:30:10:2:True LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 "
+
+#analisi qualità
+
+rule Ffastqc_paired:
+    input:
+        Ffastq_file = os.path.join(trimmed, "trim_{sample}_R1_001.fastq.gz")
+    output:
+        html_report = os.path.join(fastqc_output_directory, "trim_{sample}_R1_001_fastqc.html"),
+	zip_report = os.path.join(fastqc_output_directory, "trim_{sample}_R1_001_fastqc.zip")
+    shell:
+        "fastqc {input.Ffastq_file} --outdir={fastqc_output_directory}"
+
+rule Rfastqc_paired:
+    input:
+        Rfastq_file = os.path.join(trimmed, "trim_{sample}_R2_001.fastq.gz")
+    output:
+        html_report = os.path.join(fastqc_output_directory, "trim_{sample}_R2_001_fastqc.html"),
+	zip_report = os.path.join(fastqc_output_directory, "trim_{sample}_R2_001_fastqc.zip"),
+    shell:
+        "fastqc {input.Rfastq_file} --outdir={fastqc_output_directory}" 
+
+
+
+
+
+
+
+
+
