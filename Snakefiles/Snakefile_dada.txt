@@ -1,0 +1,41 @@
+# Definisci le variabili delle directory principali 
+base_directory = "/home/chiara-morena/PEG/"
+analysis_directory = os.path.join(base_directory, "Analysis")
+trimmed_directory = os.path.join(analysis_directory, "trimmed")
+
+
+rule all:
+  input:
+    os.path.join(analysis_directory, "trimmed","demux-paired.qza"),
+    os.path.join(base_directory, "Analysis","feature_table.qza"),
+    os.path.join(base_directory, "Analysis","feature.qza")
+
+
+##Eliminare primers
+
+
+rule trim:
+  input:
+    os.path.join(analysis_directory, "trimmed","demux-paired.qza")
+  output:
+    table = os.path.join(base_directory, "Analysis","feature_table.qza"),
+    seq = os.path.join(base_directory, "Analysis","feature.qza")
+  shell:
+    "qiime dada2 denoise-paired \
+    --p-n-threads 3 \
+    --i-demultiplexed-seqs demux-paired.qza \
+    --o-table {output.table} \
+    --o-representative-sequences {output.seq} \
+    --p-trim-left-f 0 \
+    --p-trim-left-r 0 \
+    --p-trunc-len-f 250 \
+    --p-trunc-len-r 160 \
+    --p-chimera-method consensus \
+    --o-denoising-stats dada2.stats"
+
+
+
+
+
+
+

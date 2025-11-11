@@ -1,0 +1,32 @@
+import os
+
+# Definisci le variabili delle directory principali 
+base_directory = "/home/chiara-morena/PEG/"
+classifier_directory = os.path.join(base_directory, "Classifier")
+analysis_directory = os.path.join(base_directory, "Analysis")
+metadata_directory = os.path.join(base_directory, "Meta")
+trimmed_directory = os.path.join(analysis_directory, "trimmed")
+
+rule all:
+    input:
+      os.path.join(trimmed_directory, "feature-table.qza"),
+      os.path.join(classifier_directory,"unite-ver9-taxonomy_dynamic_s_04.04.2024.qza"),
+      os.path.join(metadata_directory, "manifest_v2.tsv"),
+      os.path.join(analysis_directory,"taxa_boxplot.qzv")
+
+	
+
+
+rule boxplot:
+  input:
+    seq = os.path.join(trimmed_directory, "feature-table.qza"),
+    ref = os.path.join(classifier_directory,"unite-ver9-taxonomy_dynamic_s_04.04.2024.qza"),
+    meta = os.path.join(metadata_directory, "manifest_v2.tsv")
+  output:
+    boxplot = os.path.join(analysis_directory,"taxa_boxplot.qzv")
+  shell:
+     "qiime taxa barplot \
+     --i-table {input.seq} \
+     --i-taxonomy {input.ref} \
+     --m-metadata-file {input.meta} \
+     --o-visualization {output.boxplot}"

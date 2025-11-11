@@ -1,0 +1,33 @@
+import os
+
+# Definisci le variabili delle directory principali 
+base_directory = "/home/chiara-morena/PEG"
+data_directory = os.path.join(base_directory, "Raw")
+
+# Elenco delle sequenze e campioni
+reads = ['R1_001', 'R2_001']
+samples = ['1633957F1628706_S149_L001', '1633958F1628707_S150_L001', '1633959F1628708_S151_L001', '1633960F1628709_S152_L001','1633961F1628710_S153_L001','1633962F1628711_S154_L001','1633963F1628712_S155_L001','1633964F1628713_S156_L001']
+
+rule all:
+    input:
+        expand(os.path.join(data_directory, "{sample}_{read}.fastq.gz"), sample=samples, read=reads),
+        os.path.join("/home/chiara-morena/PEG/Analysis","demux-paired-end.qza"),
+        data_directory = os.path.join(base_directory, "Raw")
+
+
+rule import:
+  input:
+    data_directory
+
+  output:
+    os.path.join("/home/chiara-morena/PEG/Analysis","demux-paired-end.qza")
+  shell:
+     "qiime tools import \
+     --type 'SampleData[PairedEndSequencesWithQuality]' \
+     --input-path {input} \
+     --input-format CasavaOneEightSingleLanePerSampleDirFmt \
+     --output-path {output}"
+
+    
+
+

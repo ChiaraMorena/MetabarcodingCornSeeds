@@ -1,0 +1,23 @@
+# Definisci le variabili delle directory principali 
+base_directory = "/home/chiara/Frontiers/"
+data_directory = os.path.join(base_directory, "Data")
+fastqc_output_directory = os.path.join(base_directory, "Fastqc")
+
+# Elenco delle sequenze e campioni
+reads = ['1', '2']
+samples = ['SRR27781698', 'SRR27781699', 'SRR27781700', 'SRR27781701']
+
+rule all:
+    input:
+        expand(os.path.join(data_directory, "{sample}_{read}.fastq.gz"), sample=samples, read=reads),
+        expand(os.path.join(fastqc_output_directory, "{sample}_{read}_fastqc.html"), sample=samples, read=reads),
+	expand(os.path.join(fastqc_output_directory, "{sample}_{read}_fastqc.zip"), sample=samples, read=reads)
+
+rule fastqc:
+    input:
+        fastq_file = os.path.join(data_directory, "{sample}_{read}.fastq.gz")
+    output:
+        html_report = os.path.join(fastqc_output_directory, "{sample}_{read}_fastqc.html"),
+	zip_report = os.path.join(fastqc_output_directory, "{sample}_{read}_fastqc.zip")
+    shell:
+        "fastqc {input.fastq_file} --outdir={fastqc_output_directory}"

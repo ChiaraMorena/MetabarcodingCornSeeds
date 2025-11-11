@@ -1,0 +1,30 @@
+import os
+
+# Definisci le variabili delle directory principali 
+base_directory = "/home/chiara-morena/PEG/"
+classifier_directory = os.path.join(base_directory, "Classifier")
+analysis_directory = os.path.join(base_directory, "Analysis")
+trimmed_directory = os.path.join(analysis_directory, "trimmed")
+filtered_directory = os.path.join(analysis_directory,"filtered")
+
+rule all:
+    input:
+      os.path.join(trimmed_directory, "feature-table.qza"),
+      os.path.join(classifier_directory,"unite-ver9_dynamic_s_04.04.2024.qza"),
+      os.path.join(filtered_directory,"filtered-table.qza")
+
+
+	
+
+
+rule filter:
+  input:
+     seq = os.path.join(trimmed_directory, "feature-table.qza"),
+     meta = os.path.join(classifier_directory, "unite-ver9_dynamic_s_04.04.2024.qza")
+  output:
+     filtered_table = os.path.join(filtered_directory,"filtered-table.qza")
+  shell:
+     "qiime feature-table filter-features \
+     --i-table {input.seq} \
+     --m-metadata-file {input.meta} \
+     --o-filtered-table {output.filtered_table}"
